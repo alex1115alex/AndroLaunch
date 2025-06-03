@@ -9,9 +9,9 @@ import Combine
  // Replace 'AndroLaunch' with your project's main module name
 
 protocol DependencyContainerProtocol {
-    var adbService: ADBServiceProtocol { get }
-    var scrcpyService: ScrcpyServiceProtocol { get }
-    var deviceRepository: DeviceRepositoryProtocol { get }
+    var adbService: any ADBServiceProtocol { get }
+    var scrcpyService: any ScrcpyServiceProtocol { get }
+    var deviceRepository: any DeviceRepositoryProtocol { get }
     var menuViewModel: MenuViewModel { get }
 }
 
@@ -19,15 +19,15 @@ final class DependencyContainer: DependencyContainerProtocol {
     static let shared = DependencyContainer()
 
     // MARK: - Private Properties
-    private let adbServiceInstance: ADBServiceProtocol
-    private let scrcpyServiceInstance: ScrcpyServiceProtocol
-    private let deviceRepositoryInstance: DeviceRepositoryProtocol
+    private let adbServiceInstance: any ADBServiceProtocol
+    private let scrcpyServiceInstance: any ScrcpyServiceProtocol
+    private let deviceRepositoryInstance: any DeviceRepositoryProtocol
     private let menuViewModelInstance: MenuViewModel
 
     // MARK: - Initialization
     init(
-        adbService: ADBServiceProtocol = ADBService(),
-        scrcpyService: ScrcpyServiceProtocol = ScrcpyService()
+        adbService: any ADBServiceProtocol = ADBService(),
+        scrcpyService: any ScrcpyServiceProtocol = ScrcpyService()
     ) {
         self.adbServiceInstance = adbService
         self.scrcpyServiceInstance = scrcpyService
@@ -41,8 +41,8 @@ final class DependencyContainer: DependencyContainerProtocol {
     }
 
     // MARK: - Public Properties
-    var adbService: ADBServiceProtocol { adbServiceInstance }
-    var scrcpyService: ScrcpyServiceProtocol { scrcpyServiceInstance }
-    var deviceRepository: DeviceRepositoryProtocol { deviceRepositoryInstance }
+    var adbService: any ADBServiceProtocol { adbServiceInstance }
+    var scrcpyService: any ScrcpyServiceProtocol { scrcpyServiceInstance }
+    var deviceRepository: any DeviceRepositoryProtocol { deviceRepositoryInstance }
     var menuViewModel: MenuViewModel { menuViewModelInstance }
 }

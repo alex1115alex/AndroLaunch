@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuController: StatusMenuController?
@@ -15,6 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         let container = DependencyContainer.shared
         statusMenuController = StatusMenuController(viewModel: container.menuViewModel)
+        
+        // Enable launch at login if not already set
+        if !SMAppService.mainApp.status.isEnabled {
+            try? SMAppService.mainApp.register()
+        }
     }
 
     func openPreferences() {
