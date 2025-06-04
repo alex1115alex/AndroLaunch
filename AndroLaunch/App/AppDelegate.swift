@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuController = StatusMenuController(viewModel: container.menuViewModel)
         
         // Enable launch at login if not already set
-        if !SMAppService.mainApp.status.isEnabled {
+        if SMAppService.mainApp.status != .enabled {
             try? SMAppService.mainApp.register()
         }
     }

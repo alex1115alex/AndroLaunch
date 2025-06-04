@@ -249,7 +249,7 @@ final class ADBService: ADBServiceProtocol {
 
     // MARK: - App Listing
     func fetchApps(for deviceID: String) {
-        guard let adbPath = currentADBPath else {
+        guard currentADBPath != nil else {
             print("ADB path not set, cannot fetch apps.")
             return
         }
