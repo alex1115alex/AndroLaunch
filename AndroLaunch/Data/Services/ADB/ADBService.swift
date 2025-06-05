@@ -663,4 +663,153 @@ final class ADBService: ADBServiceProtocol {
             print("No running SCRCPY process found for device \(deviceID).")
         }
     }
+    
+    // MARK: - Screenshot Capture
+    func takeScreenshot(deviceID: String, completion: @escaping (Bool, NSImage?) -> Void) {
+        guard let adbPath = currentADBPath else {
+            print("❌ ADB path not set, cannot take screenshot.")
+            completion(false, nil)
+            return
+        }
+        
+        print("🚀 STARTING screenshot capture for device: \(deviceID) using ADB path: \(adbPath)")
+        
+        // Use a temporary file approach which is more reliable
+        DispatchQueue.global(qos: .background).async {
+            let tempDir = NSTemporaryDirectory()
+            let tempFile = tempDir + "androlaunch_screenshot_\(UUID().uuidString).png"
+            
+            print("🔧 Using temp file: \(tempFile)")
+            
+            // First step: Take screenshot to device storage (try specific display)
+            let screencapTask = Process()
+            screencapTask.executableURL = URL(fileURLWithPath: adbPath)
+            screencapTask.arguments = ["-s", deviceID, "shell", "screencap", "-d", "4630947043778501763", "-p", "/sdcard/screenshot_temp.png"]
+            
+            print("🔧 Step 1: Waking device and taking screenshot...")
+            
+            // First wake the device
+            let wakeTask = Process()
+            wakeTask.executableURL = URL(fileURLWithPath: adbPath)
+            wakeTask.arguments = ["-s", deviceID, "shell", "input", "keyevent", "KEYCODE_WAKEUP"]
+            try? wakeTask.run()
+            wakeTask.waitUntilExit()
+            
+            // Small delay to let device wake up
+            Thread.sleep(forTimeInterval: 0.5)
+            
+            do {
+                try screencapTask.run()
+                screencapTask.waitUntilExit()
+                
+                print("🔧 Screenshot command exit status: \(screencapTask.terminationStatus)")
+                
+                if screencapTask.terminationStatus != 0 {
+                    print("❌ Failed to take screenshot on device (status: \(screencapTask.terminationStatus))")
+                    
+                    // Try alternative approach with different path
+                    let altScreencapTask = Process()
+                    altScreencapTask.executableURL = URL(fileURLWithPath: adbPath)
+                    altScreencapTask.arguments = ["-s", deviceID, "shell", "screencap", "/data/local/tmp/screenshot.png"]
+                    
+                    print("🔧 Trying alternative screenshot location...")
+                    try altScreencapTask.run()
+                    altScreencapTask.waitUntilExit()
+                    
+                    if altScreencapTask.terminationStatus == 0 {
+                        // Pull from alternative location
+                        let altPullTask = Process()
+                        altPullTask.executableURL = URL(fileURLWithPath: adbPath)
+                        altPullTask.arguments = ["-s", deviceID, "pull", "/data/local/tmp/screenshot.png", tempFile]
+                        
+                        try altPullTask.run()
+                        altPullTask.waitUntilExit()
+                        
+                        if altPullTask.terminationStatus == 0 {
+                            print("✅ Screenshot saved using alternative method")
+                            
+                            // Clean up on device
+                            let cleanupTask = Process()
+                            cleanupTask.executableURL = URL(fileURLWithPath: adbPath)
+                            cleanupTask.arguments = ["-s", deviceID, "shell", "rm", "/data/local/tmp/screenshot.png"]
+                            try? cleanupTask.run()
+                            
+                            // Load image from temp file
+                            let imageData = try Data(contentsOf: URL(fileURLWithPath: tempFile))
+                            print("🔧 Loaded \(imageData.count) bytes from temp file")
+                            
+                            if let image = NSImage(data: imageData) {
+                                print("✅ Successfully created NSImage")
+                                try? FileManager.default.removeItem(atPath: tempFile)
+                                DispatchQueue.main.async {
+                                    completion(true, image)
+                                }
+                                return
+                            }
+                        }
+                    }
+                    
+                    DispatchQueue.main.async {
+                        completion(false, nil)
+                    }
+                    return
+                }
+                
+                print("✅ Screenshot saved on device")
+                
+                // Second step: Pull screenshot from device
+                let pullTask = Process()
+                pullTask.executableURL = URL(fileURLWithPath: adbPath)
+                pullTask.arguments = ["-s", deviceID, "pull", "/sdcard/screenshot_temp.png", tempFile]
+                
+                print("🔧 Step 2: Pulling screenshot from device...")
+                try pullTask.run()
+                pullTask.waitUntilExit()
+                
+                if pullTask.terminationStatus != 0 {
+                    print("❌ Failed to pull screenshot from device")
+                    DispatchQueue.main.async {
+                        completion(false, nil)
+                    }
+                    return
+                }
+                
+                print("✅ Screenshot pulled to temp file")
+                
+                // Third step: Load image from temp file
+                let imageData = try Data(contentsOf: URL(fileURLWithPath: tempFile))
+                print("🔧 Loaded \(imageData.count) bytes from temp file")
+                
+                if let image = NSImage(data: imageData) {
+                    print("✅ Successfully created NSImage")
+                    
+                    // Clean up temp files
+                    try? FileManager.default.removeItem(atPath: tempFile)
+                    
+                    // Clean up screenshot on device
+                    let cleanupTask = Process()
+                    cleanupTask.executableURL = URL(fileURLWithPath: adbPath)
+                    cleanupTask.arguments = ["-s", deviceID, "shell", "rm", "/sdcard/screenshot_temp.png"]
+                    try? cleanupTask.run()
+                    
+                    DispatchQueue.main.async {
+                        completion(true, image)
+                    }
+                } else {
+                    print("❌ Failed to create NSImage from file data")
+                    try? FileManager.default.removeItem(atPath: tempFile)
+                    DispatchQueue.main.async {
+                        completion(false, nil)
+                    }
+                }
+                
+            } catch {
+                print("❌ Screenshot process failed: \(error.localizedDescription)")
+                try? FileManager.default.removeItem(atPath: tempFile)
+                DispatchQueue.main.async {
+                    completion(false, nil)
+                }
+            }
+        }
+    }
 }

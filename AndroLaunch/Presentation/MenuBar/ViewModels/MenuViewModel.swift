@@ -8,6 +8,9 @@
 
 import Combine
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 final class MenuViewModel: ObservableObject {
     @Published var devices: [AndroidDevice] = []
@@ -49,5 +52,8 @@ final class MenuViewModel: ObservableObject {
     }
     func launchApp(packageID: String, deviceID: String) { repository.launchApp(packageID: packageID, deviceID: deviceID) }
     func mirrorDevice(deviceID: String) { repository.mirrorDevice(deviceID: deviceID) }
+    func takeScreenshot(deviceID: String, completion: @escaping (Bool, NSImage?) -> Void) {
+        repository.takeScreenshot(deviceID: deviceID, completion: completion)
+    }
     
 }

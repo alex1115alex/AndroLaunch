@@ -1,11 +1,15 @@
 import SwiftUI
 import ServiceManagement
 
-struct SettingsView: View {
+struct SimpleSettingsView: View {
     @State private var launchAtLogin: Bool = false
     
     var body: some View {
         VStack(spacing: 24) {
+            // Add some top spacing
+            Spacer()
+                .frame(height: 30)
+            
             // Header
             HStack {
                 Image(systemName: "square.grid.2x2.fill")
@@ -80,28 +84,40 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(24)
-        .frame(width: 400, height: 320)
+        .frame(width: 420, height: 380)
         .onAppear {
             checkLaunchAtLoginStatus()
         }
     }
     
     private func checkLaunchAtLoginStatus() {
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        let status = SMAppService.mainApp.status
+        launchAtLogin = status == .enabled
+        print("🚀 Launch at login status checked: \(status) -> toggle: \(launchAtLogin)")
     }
     
     private func setLaunchAtLogin(enabled: Bool) {
+        print("🚀 Attempting to \(enabled ? "enable" : "disable") launch at login...")
         do {
             if enabled {
                 try SMAppService.mainApp.register()
+                print("🚀 Successfully registered for launch at login")
             } else {
                 try SMAppService.mainApp.unregister()
+                print("🚀 Successfully unregistered from launch at login")
             }
+            
+            // Verify the change took effect
+            let newStatus = SMAppService.mainApp.status
+            print("🚀 New launch at login status: \(newStatus)")
+            
         } catch {
-            print("Failed to \(enabled ? "enable" : "disable") launch at login: \(error)")
+            print("❌ Failed to \(enabled ? "enable" : "disable") launch at login: \(error)")
             // Revert the toggle if the operation failed
             DispatchQueue.main.async {
-                launchAtLogin = SMAppService.mainApp.status == .enabled
+                let currentStatus = SMAppService.mainApp.status
+                launchAtLogin = currentStatus == .enabled
+                print("🚀 Reverted toggle to: \(launchAtLogin) (status: \(currentStatus))")
             }
         }
     }

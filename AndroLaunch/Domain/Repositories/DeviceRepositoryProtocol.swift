@@ -7,6 +7,9 @@
 
 import Combine
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 protocol DeviceRepositoryProtocol: ObservableObject {
     var objectWillChange: ObservableObjectPublisher { get }
@@ -24,4 +27,5 @@ protocol DeviceRepositoryProtocol: ObservableObject {
     func fetchApps(for deviceID: String)
     func launchApp(packageID: String, deviceID: String)
     func mirrorDevice(deviceID: String)
+    func takeScreenshot(deviceID: String, completion: @escaping (Bool, NSImage?) -> Void)
 }

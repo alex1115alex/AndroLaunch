@@ -8,6 +8,9 @@
 import Foundation
 import Combine
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 final class DeviceRepository: DeviceRepositoryProtocol { // Conform to the protocol defined in Domain
 
@@ -85,5 +88,9 @@ final class DeviceRepository: DeviceRepositoryProtocol { // Conform to the proto
 
     func mirrorDevice(deviceID: String) {
         adbService.mirrorDevice(deviceID: deviceID)
+    }
+    
+    func takeScreenshot(deviceID: String, completion: @escaping (Bool, NSImage?) -> Void) {
+        adbService.takeScreenshot(deviceID: deviceID, completion: completion)
     }
 }

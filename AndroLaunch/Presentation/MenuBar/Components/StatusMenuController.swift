@@ -5,20 +5,23 @@
 
 import AppKit
 import Combine
+import SwiftUI
 
 final class StatusMenuController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let viewModel: MenuViewModel
     private var cancellables = Set<AnyCancellable>()
     private var currentDeviceID: String?
+    private weak var appDelegate: AppDelegate?
     
     // MARK: - Search Field Subclass
     private class DeviceSearchField: NSSearchField {
         var deviceID: String?
     }
 
-    init(viewModel: MenuViewModel) {
+    init(viewModel: MenuViewModel, appDelegate: AppDelegate? = nil) {
         self.viewModel = viewModel
+        self.appDelegate = appDelegate
         super.init()
         setupMenu()
         bindViewModel()
@@ -28,10 +31,8 @@ final class StatusMenuController: NSObject {
         if let button = statusItem.button {
             let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .medium)
             button.image = NSImage(systemSymbolName: "square.grid.2x2.fill", accessibilityDescription: "AndroLaunch")?.withSymbolConfiguration(config)
-            button.imagePosition = .imageLeft
-            button.title = "Launcher"
-            button.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-            statusItem.length = 100
+            button.title = ""
+            statusItem.length = NSStatusItem.squareLength
         }
         refreshDevices()
         updateMenu()
@@ -112,16 +113,16 @@ final class StatusMenuController: NSObject {
         
         menu.addItem(NSMenuItem.separator())
         
-        // About Item
-        let aboutItem = NSMenuItem(
-            title: "About",
-            action: #selector(openGitHub),
-            keyEquivalent: ""
+        // Settings Item
+        let settingsItem = NSMenuItem(
+            title: "Settings",
+            action: #selector(openSettings),
+            keyEquivalent: ","
         )
-        aboutItem.target = self
-        aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "About")
-        aboutItem.image?.size = NSSize(width: 16, height: 16)
-        menu.addItem(aboutItem)
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gear", accessibilityDescription: "Settings")
+        settingsItem.image?.size = NSSize(width: 16, height: 16)
+        menu.addItem(settingsItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -150,6 +151,18 @@ final class StatusMenuController: NSObject {
         mirrorItem.image = NSImage(systemSymbolName: "display", accessibilityDescription: "Mirror")
         mirrorItem.image?.size = NSSize(width: 16, height: 16)
         submenu.addItem(mirrorItem)
+        
+        // Screenshot Action
+        let screenshotItem = NSMenuItem(
+            title: "Get Screenshot",
+            action: #selector(takeScreenshot),
+            keyEquivalent: ""
+        )
+        screenshotItem.target = self
+        screenshotItem.representedObject = device.id
+        screenshotItem.image = NSImage(systemSymbolName: "camera", accessibilityDescription: "Screenshot")
+        screenshotItem.image?.size = NSSize(width: 16, height: 16)
+        submenu.addItem(screenshotItem)
         submenu.addItem(NSMenuItem.separator())
         
         // Apps Section
@@ -280,9 +293,104 @@ final class StatusMenuController: NSObject {
         viewModel.mirrorDevice(deviceID: deviceID)
     }
     
-    @objc private func openGitHub() {
-        if let url = URL(string: "https://github.com/aman-senpai/AndroLaunch") {
-            NSWorkspace.shared.open(url)
+    @objc private func takeScreenshot(_ sender: NSMenuItem) {
+        guard let deviceID = sender.representedObject as? String else { return }
+        print("📸 Taking screenshot for device: \(deviceID)")
+        
+        viewModel.takeScreenshot(deviceID: deviceID) { [weak self] success, image in
+            DispatchQueue.main.async {
+                print("📸 Screenshot result - success: \(success), image: \(image != nil ? "✅" : "❌")")
+                if success, let image = image {
+                    self?.copyImageToClipboard(image)
+                    self?.showToast(message: "Screenshot copied to clipboard")
+                } else {
+                    self?.showToast(message: "Failed to capture screenshot")
+                }
+            }
+        }
+    }
+    
+    @objc private func openSettings() {
+        print("🔧 Settings menu item clicked")
+        if let appDelegate = self.appDelegate {
+            print("🔧 Using stored AppDelegate reference")
+            appDelegate.openPreferences()
+        } else {
+            print("❌ No AppDelegate reference stored")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    private func copyImageToClipboard(_ image: NSImage) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let success = pasteboard.writeObjects([image])
+        print("📋 Image copied to clipboard: \(success ? "✅" : "❌")")
+    }
+    
+    private func showToast(message: String) {
+        print("🍞 Showing custom toast: \(message)")
+        
+        DispatchQueue.main.async {
+            self.showCustomToast(message: message)
+        }
+    }
+    
+    private func showCustomToast(message: String) {
+        // Get main screen dimensions
+        guard let mainScreen = NSScreen.main else { return }
+        let screenFrame = mainScreen.frame
+        
+        // Toast dimensions
+        let toastWidth: CGFloat = 300
+        let toastHeight: CGFloat = 60
+        let bottomMargin: CGFloat = 100
+        
+        // Calculate position (bottom center)
+        let toastX = (screenFrame.width - toastWidth) / 2
+        let toastY = bottomMargin
+        
+        // Create toast window
+        let toastWindow = NSWindow(
+            contentRect: NSRect(x: toastX, y: toastY, width: toastWidth, height: toastHeight),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
+        // Configure window properties
+        toastWindow.backgroundColor = .clear
+        toastWindow.isOpaque = false
+        toastWindow.hasShadow = true
+        toastWindow.level = .floating
+        toastWindow.ignoresMouseEvents = true
+        toastWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        
+        // Create toast content view
+        let toastView = ToastView(message: message)
+        let hostingController = NSHostingController(rootView: toastView)
+        toastWindow.contentViewController = hostingController
+        
+        // Show with animation
+        toastWindow.alphaValue = 0
+        toastWindow.orderFront(nil)
+        
+        // Fade in animation
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            toastWindow.animator().alphaValue = 1.0
+        }
+        
+        // Auto-dismiss after 2.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.3
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                toastWindow.animator().alphaValue = 0
+            } completionHandler: {
+                toastWindow.orderOut(nil)
+            }
         }
     }
 }
